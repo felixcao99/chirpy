@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync/atomic"
@@ -18,6 +19,7 @@ func main() {
 	serverMux.Handle("/assets/", apiCfg.middlewareMetricsInc(http.FileServer(http.Dir("."))))
 	serverMux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir(".")))))
 	serverMux.HandleFunc("GET /api/healthz", healthzHandler)
+	serverMux.HandleFunc("POST /api/validate_chirp", validateChirpHandler)
 	// serverMux.HandleFunc("GET /api/metrics", metricsHandler)
 	serverMux.HandleFunc("GET /admin/metrics", adminMetricsHandler)
 	// serverMux.HandleFunc("POST /api/reset", metricsReset)
@@ -65,4 +67,44 @@ func metricsReset(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	apiCfg.fileserverHits.Store(0)
+}
+
+func validateChirpHandler(w http.ResponseWriter, r *http.Request) {
+	type chirpRequest struct {
+		Chirp string `json:"body"`
+	}
+	type validResponse struct {
+		Valid bool `json:"valid"`
+	}
+	type errorResponse struct {
+		Error string `json:"error"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	chirpbody := chirpRequest{}
+	err := decoder.Decode(&chirpbody)
+	if err == nil {
+		if len(chipbody.Chirp) <= 140 {
+			validres := validResponse{Valid: true}
+			validjson, _ := json.Marshal(validres)
+			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(validjson)
+			return
+		} else {
+			errdres := errorResponse{Error: "Chirp is too long"}
+			errson, _ := json.Marshal(errdres)
+			w.WriteHeader(400)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(errson)
+			return
+		}
+	} else {
+		errdres := errorResponse{Error: "Invalid JSON"}
+		errson, _ := json.Marshal(errdres)
+		w.WriteHeader(400)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(errson)
+		return
+	}
 }
