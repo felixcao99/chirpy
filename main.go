@@ -84,7 +84,7 @@ func validateChirpHandler(w http.ResponseWriter, r *http.Request) {
 	chirpbody := chirpRequest{}
 	err := decoder.Decode(&chirpbody)
 	if err == nil {
-		if len(chipbody.Chirp) <= 140 {
+		if len(chirpbody.Chirp) <= 140 {
 			validres := validResponse{Valid: true}
 			validjson, _ := json.Marshal(validres)
 			w.WriteHeader(http.StatusOK)
