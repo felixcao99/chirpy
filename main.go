@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sync/atomic"
 )
 
@@ -73,19 +74,31 @@ func validateChirpHandler(w http.ResponseWriter, r *http.Request) {
 	type chirpRequest struct {
 		Chirp string `json:"body"`
 	}
-	type validResponse struct {
-		Valid bool `json:"valid"`
-	}
+	// type validResponse struct {
+	// 	Valid bool `json:"valid"`
+	// }
 	type errorResponse struct {
 		Error string `json:"error"`
 	}
+	type cleanedResponse struct {
+		Cleanedbody string `json:"cleaned_body"`
+	}
+
+	var replaced string
+
+	filter := []string{"kerfuffle", "sharbert", "fornax"}
 
 	decoder := json.NewDecoder(r.Body)
 	chirpbody := chirpRequest{}
 	err := decoder.Decode(&chirpbody)
 	if err == nil {
 		if len(chirpbody.Chirp) <= 140 {
-			validres := validResponse{Valid: true}
+			replaced = chirpbody.Chirp
+			for _, badword := range filter {
+				re := regexp.MustCompile("(?i)" + badword)
+				replaced = re.ReplaceAllString(replaced, "****")
+			}
+			validres := cleanedResponse{Cleanedbody: replaced}
 			validjson, _ := json.Marshal(validres)
 			w.WriteHeader(http.StatusOK)
 			w.Header().Set("Content-Type", "application/json")
