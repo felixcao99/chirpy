@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/felixcao99/chirpy/internal/auth"
 	"github.com/felixcao99/chirpy/internal/database"
@@ -65,19 +66,24 @@ func userHandler(w http.ResponseWriter, r *http.Request) {
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	type loginRequest struct {
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Password  string `json:"password"`
+		Email     string `json:"email"`
+		Expiresin int    `json:"expires_in_seconds"`
 	}
 
 	type errorResponse struct {
 		Error string `json:"error"`
 	}
+
 	type loginResponse struct {
 		Id        string `json:"id"`
 		CreatedAt string `json:"created_at"`
 		UpdatedAt string `json:"updated_at"`
 		Email     string `json:"email"`
+		Token     string `json:"token"`
 	}
+
+	var expireseconds time.Duration
 
 	decoder := json.NewDecoder(r.Body)
 	loginrequest := loginRequest{}
@@ -89,6 +95,12 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(errson)
 		return
+	}
+
+	if loginrequest.Expiresin > 0 && loginrequest.Expiresin < 3600 {
+		expireseconds = time.Duration(loginrequest.Expiresin) * time.Second
+	} else {
+		expireseconds = time.Duration(3600) * time.Second
 	}
 
 	user, err := apiCfg.dbQueries.GetUserByEmail(r.Context(), loginrequest.Email)
@@ -111,11 +123,22 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	jwttoken, err := auth.MakeJWT(user.ID, apiCfg.jwtscecret, expireseconds)
+	if err != nil {
+		errdres := errorResponse{Error: "Token not generated"}
+		errson, _ := json.Marshal(errdres)
+		w.WriteHeader(401)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(errson)
+		return
+	}
+
 	res := loginResponse{
 		Id:        user.ID.String(),
 		CreatedAt: user.CreatedAt.String(),
 		UpdatedAt: user.UpdatedAt.String(),
 		Email:     user.Email,
+		Token:     jwttoken,
 	}
 	resjson, _ := json.Marshal(res)
 	w.WriteHeader(200)

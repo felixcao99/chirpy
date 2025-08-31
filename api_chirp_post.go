@@ -5,14 +5,15 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/felixcao99/chirpy/internal/auth"
 	"github.com/felixcao99/chirpy/internal/database"
-	"github.com/google/uuid"
+	// "github.com/google/uuid"
 )
 
 func postChirpsHandler(w http.ResponseWriter, r *http.Request) {
 	type chirpRequest struct {
-		Chirp  string `json:"body"`
-		UserID string `json:"user_id"`
+		Chirp string `json:"body"`
+		// UserID string `json:"user_id"`
 	}
 
 	type errorResponse struct {
@@ -30,9 +31,28 @@ func postChirpsHandler(w http.ResponseWriter, r *http.Request) {
 	filter := []string{"kerfuffle", "sharbert", "fornax"}
 	var createPara database.CreateChirpParams
 
+	jwttoken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		errdres := errorResponse{Error: "Not Authorized"}
+		errson, _ := json.Marshal(errdres)
+		w.WriteHeader(401)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(errson)
+		return
+	}
+	userid, err := auth.ValidateJWT(jwttoken, apiCfg.jwtscecret)
+	if err != nil {
+		errdres := errorResponse{Error: "Not Authorized"}
+		errson, _ := json.Marshal(errdres)
+		w.WriteHeader(401)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(errson)
+		return
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	chirpbody := chirpRequest{}
-	err := decoder.Decode(&chirpbody)
+	err = decoder.Decode(&chirpbody)
 	if err == nil {
 		if len(chirpbody.Chirp) <= 140 {
 			replaced = chirpbody.Chirp
@@ -41,7 +61,7 @@ func postChirpsHandler(w http.ResponseWriter, r *http.Request) {
 				replaced = re.ReplaceAllString(replaced, "****")
 			}
 			createPara.Body = replaced
-			createPara.UserID, _ = uuid.Parse(chirpbody.UserID)
+			createPara.UserID = userid
 
 			chirp, err := apiCfg.dbQueries.CreateChirp(r.Context(), createPara)
 			if err != nil {

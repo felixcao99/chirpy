@@ -22,6 +22,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	dbQueries      *database.Queries
 	platform       string
+	jwtscecret     string
 }
 
 var apiCfg *apiConfig
@@ -30,6 +31,7 @@ func main() {
 	godotenv.Load()
 	dbURL := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
+	jwtscecret := os.Getenv("JWT_SECRET")
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		fmt.Println("Error connecting to the database:", err)
@@ -40,6 +42,7 @@ func main() {
 	apiCfg = &apiConfig{}
 	apiCfg.dbQueries = dbQueries
 	apiCfg.platform = platform
+	apiCfg.jwtscecret = jwtscecret
 
 	serverMux := http.NewServeMux()
 	serverMux.Handle("/assets/", apiCfg.middlewareMetricsInc(http.FileServer(http.Dir("."))))
