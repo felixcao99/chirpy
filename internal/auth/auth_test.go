@@ -2,7 +2,6 @@ package auth
 
 import (
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -10,8 +9,7 @@ import (
 func TestJwt(t *testing.T) {
 	userID := uuid.New()
 	tokenSecret := "mysecret"
-	expiresIn := time.Minute * 5
-	token, err := MakeJWT(userID, tokenSecret, expiresIn)
+	token, err := MakeJWT(userID, tokenSecret)
 	if err != nil {
 		t.Fatalf("Failed to create JWT: %v", err)
 	}
@@ -21,5 +19,16 @@ func TestJwt(t *testing.T) {
 	}
 	if parsedUserID != userID {
 		t.Fatalf("Parsed userID does not match original. Got %v, want %v", parsedUserID, userID)
+	}
+}
+
+func TestFreshtoken(t *testing.T) {
+	token, err := MakeRefreshToken()
+	if err != nil {
+		t.Fatalf("Failed to generate random token: %v", err)
+	}
+
+	if len(token) != 32 {
+		t.Fatalf("Token %s length is incorrect. Got %d, want 32", token, len(token))
 	}
 }

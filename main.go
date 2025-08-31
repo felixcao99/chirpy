@@ -58,6 +58,8 @@ func main() {
 	serverMux.HandleFunc("GET /api/chirps/{chirpID}", getChirpByIDHandler)
 	serverMux.HandleFunc("GET /api/chirps", allChirpsHandler)
 	serverMux.HandleFunc("POST /api/login", loginHandler)
+	serverMux.HandleFunc("POST /api/refresh", refreshHandler)
+	serverMux.HandleFunc("POST /api/revoke", revokeRefreshTokenHandler)
 
 	serverMux.HandleFunc("GET /api/test/{chirpID}", testHandler)
 

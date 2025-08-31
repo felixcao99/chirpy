@@ -1,11 +1,14 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/felixcao99/chirpy/internal/database"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -20,9 +23,9 @@ func CheckPasswordHash(password, hash string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
 
-func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
+func MakeJWT(userID uuid.UUID, tokenSecret string) (string, error) {
 	currentUTC := jwt.NewNumericDate(time.Now().UTC())
-	expireTime := jwt.NewNumericDate(time.Now().UTC().Add(expiresIn))
+	expireTime := jwt.NewNumericDate(time.Now().UTC().Add(time.Duration(3600) * time.Second))
 
 	claims := &jwt.RegisteredClaims{
 		Issuer:    "chirpy",
@@ -69,4 +72,23 @@ func GetBearerToken(headers http.Header) (string, error) {
 		err := errors.New("not authorrized")
 		return "", err
 	}
+}
+
+func MakeRefreshToken() (string, error) {
+	key := make([]byte, 32)
+	_, err := rand.Read(key)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(key), nil
+}
+
+func ValidateFreshToken(refreshtoken database.Refreshtoken) (uuid.UUID, error) {
+	if refreshtoken.RevokedAt.Valid {
+		return uuid.UUID{}, errors.New("refresh token revoked")
+	}
+	if time.Now().After(refreshtoken.ExpiresAt) {
+		return uuid.UUID{}, errors.New("refresh token expired")
+	}
+	return refreshtoken.UserID, nil
 }
