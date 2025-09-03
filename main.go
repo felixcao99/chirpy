@@ -56,10 +56,12 @@ func main() {
 	serverMux.HandleFunc("POST /admin/reset", metricsReset)
 	serverMux.HandleFunc("POST /api/chirps", postChirpsHandler)
 	serverMux.HandleFunc("GET /api/chirps/{chirpID}", getChirpByIDHandler)
+	serverMux.HandleFunc("DELETE /api/chirps/{chirpID}", deleteChirpByIDHandler)
 	serverMux.HandleFunc("GET /api/chirps", allChirpsHandler)
 	serverMux.HandleFunc("POST /api/login", loginHandler)
 	serverMux.HandleFunc("POST /api/refresh", refreshHandler)
 	serverMux.HandleFunc("POST /api/revoke", revokeRefreshTokenHandler)
+	serverMux.HandleFunc("PUT /api/users", userUpdateHandler)
 
 	serverMux.HandleFunc("GET /api/test/{chirpID}", testHandler)
 
