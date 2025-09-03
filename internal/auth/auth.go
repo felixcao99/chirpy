@@ -92,3 +92,20 @@ func ValidateFreshToken(refreshtoken database.Refreshtoken) (uuid.UUID, error) {
 	}
 	return refreshtoken.UserID, nil
 }
+
+func GetAPIKey(headers http.Header) (string, error) {
+	apikey := headers.Get("Authorization")
+	if len(apikey) == 0 {
+		err := errors.New("not authorrized")
+		return "", err
+	}
+
+	key, found := strings.CutPrefix(apikey, "ApiKey")
+	if found {
+		key = strings.TrimSpace(key)
+		return key, nil
+	} else {
+		err := errors.New("not authorrized")
+		return "", err
+	}
+}

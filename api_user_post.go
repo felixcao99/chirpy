@@ -6,6 +6,7 @@ import (
 
 	"github.com/felixcao99/chirpy/internal/auth"
 	"github.com/felixcao99/chirpy/internal/database"
+	"github.com/google/uuid"
 
 	_ "github.com/lib/pq"
 )
@@ -24,6 +25,7 @@ func userHandler(w http.ResponseWriter, r *http.Request) {
 		CreatedAt string `json:"created_at"`
 		UpdatedAt string `json:"updated_at"`
 		Email     string `json:"email"`
+		Red       bool   `json:"is_chirpy_red"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -51,12 +53,20 @@ func userHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write(errson)
 		return
 	}
+
+	var isChirpyRed bool
+	if user.IsChirpyRed.Valid {
+		isChirpyRed = user.IsChirpyRed.Bool
+	}
+
 	res := userResponse{
 		Id:        user.ID.String(),
 		CreatedAt: user.CreatedAt.String(),
 		UpdatedAt: user.UpdatedAt.String(),
 		Email:     user.Email,
+		Red:       isChirpyRed,
 	}
+
 	resjson, _ := json.Marshal(res)
 	w.WriteHeader(201)
 	w.Header().Set("Content-Type", "application/json")
@@ -81,6 +91,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		Email      string `json:"email"`
 		Token      string `json:"token"`
 		FreshToken string `json:"refresh_token"`
+		Red        bool   `json:"is_chirpy_red"`
 	}
 
 	var insertfreshtoken database.InsertFreshTokenParams
@@ -147,6 +158,11 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var isChirpyRed bool
+	if user.IsChirpyRed.Valid {
+		isChirpyRed = user.IsChirpyRed.Bool
+	}
+
 	res := loginResponse{
 		Id:         user.ID.String(),
 		CreatedAt:  user.CreatedAt.String(),
@@ -154,7 +170,9 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		Email:      user.Email,
 		Token:      jwttoken,
 		FreshToken: insertedfreshtoken.Token,
+		Red:        isChirpyRed,
 	}
+
 	resjson, _ := json.Marshal(res)
 	w.WriteHeader(200)
 	w.Header().Set("Content-Type", "application/json")
@@ -253,6 +271,93 @@ func revokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	res := successResponse{
 		Message: "Refresh token revoked for user " + storedfreshtoken.UserID.String(),
+	}
+	resjson, _ := json.Marshal(res)
+	w.WriteHeader(204)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(resjson)
+}
+
+func polkaWebhooksHandler(w http.ResponseWriter, r *http.Request) {
+	type polkaData struct {
+		UserID string `json:"user_id"`
+	}
+	type polkaRequest struct {
+		Event string    `json:"event"`
+		Data  polkaData `json:"data"`
+	}
+
+	type errorResponse struct {
+		Error string `json:"error"`
+	}
+
+	type eventResponse struct {
+		Event string `json:"event"`
+	}
+
+	type userResponse struct {
+		Id        string `json:"id"`
+		CreatedAt string `json:"created_at"`
+		UpdatedAt string `json:"updated_at"`
+		Email     string `json:"email"`
+		Red       bool   `json:"is_chirpy_red"`
+	}
+
+	apikey, err := auth.GetAPIKey(r.Header)
+	if err != nil || apikey != apiCfg.polkakey {
+		errdres := errorResponse{Error: "Not Authorized"}
+		errson, _ := json.Marshal(errdres)
+		w.WriteHeader(401)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(errson)
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	polkarequest := polkaRequest{}
+	err = decoder.Decode(&polkarequest)
+	if err != nil {
+		errdres := errorResponse{Error: "Invalid JSON"}
+		errson, _ := json.Marshal(errdres)
+		w.WriteHeader(400)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(errson)
+		return
+	}
+
+	if polkarequest.Event != "user.upgraded" {
+		eventres := eventResponse{Event: polkarequest.Event}
+		evenson, _ := json.Marshal(eventres)
+		w.WriteHeader(204)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(evenson)
+		return
+	}
+
+	userid, err := uuid.Parse(polkarequest.Data.UserID)
+	if err != nil {
+		errdres := errorResponse{Error: "Invalid UserID"}
+		errson, _ := json.Marshal(errdres)
+		w.WriteHeader(404)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(errson)
+		return
+	}
+	user, err := apiCfg.dbQueries.UpdateUserRed(r.Context(), userid)
+	if err != nil {
+		errdres := errorResponse{Error: "Database error"}
+		errson, _ := json.Marshal(errdres)
+		w.WriteHeader(500)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(errson)
+		return
+	}
+	res := userResponse{
+		Id:        user.ID.String(),
+		CreatedAt: user.CreatedAt.String(),
+		UpdatedAt: user.UpdatedAt.String(),
+		Email:     user.Email,
+		Red:       user.IsChirpyRed.Bool,
 	}
 	resjson, _ := json.Marshal(res)
 	w.WriteHeader(204)

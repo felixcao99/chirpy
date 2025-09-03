@@ -23,6 +23,7 @@ type apiConfig struct {
 	dbQueries      *database.Queries
 	platform       string
 	jwtscecret     string
+	polkakey       string
 }
 
 var apiCfg *apiConfig
@@ -32,6 +33,7 @@ func main() {
 	dbURL := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
 	jwtscecret := os.Getenv("JWT_SECRET")
+	polkakey := os.Getenv("POLKA_KEY")
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		fmt.Println("Error connecting to the database:", err)
@@ -43,6 +45,7 @@ func main() {
 	apiCfg.dbQueries = dbQueries
 	apiCfg.platform = platform
 	apiCfg.jwtscecret = jwtscecret
+	apiCfg.polkakey = polkakey
 
 	serverMux := http.NewServeMux()
 	serverMux.Handle("/assets/", apiCfg.middlewareMetricsInc(http.FileServer(http.Dir("."))))
@@ -62,6 +65,7 @@ func main() {
 	serverMux.HandleFunc("POST /api/refresh", refreshHandler)
 	serverMux.HandleFunc("POST /api/revoke", revokeRefreshTokenHandler)
 	serverMux.HandleFunc("PUT /api/users", userUpdateHandler)
+	serverMux.HandleFunc("POST /api/polka/webhooks", polkaWebhooksHandler)
 
 	serverMux.HandleFunc("GET /api/test/{chirpID}", testHandler)
 
