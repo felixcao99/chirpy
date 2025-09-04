@@ -3,6 +3,9 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
+
+	"github.com/felixcao99/chirpy/internal/database"
 
 	"github.com/google/uuid"
 )
@@ -20,14 +23,55 @@ func allChirpsHandler(w http.ResponseWriter, r *http.Request) {
 		Error string `json:"error"`
 	}
 
-	chirps, err := apiCfg.dbQueries.AllChirps(r.Context())
-	if err != nil {
-		errdres := errorResponse{Error: "Database error"}
-		errson, _ := json.Marshal(errdres)
-		w.WriteHeader(500)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(errson)
-		return
+	// chirps, err := apiCfg.dbQueries.AllChirps(r.Context())
+	// if err != nil {
+	// 	errdres := errorResponse{Error: "Database error"}
+	// 	errson, _ := json.Marshal(errdres)
+	// 	w.WriteHeader(500)
+	// 	w.Header().Set("Content-Type", "application/json")
+	// 	w.Write(errson)
+	// 	return
+	// }
+	var chirps []database.Chirp
+	var err error
+
+	userid := r.URL.Query().Get("author_id")
+	if len(userid) > 0 {
+		useruuid, err := uuid.Parse(userid)
+		if err != nil {
+			errdres := errorResponse{Error: "Invalid user ID"}
+			errson, _ := json.Marshal(errdres)
+			w.WriteHeader(400)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(errson)
+			return
+		}
+		chirps, err = apiCfg.dbQueries.AllChirpsByUserID(r.Context(), useruuid)
+		if err != nil {
+			errdres := errorResponse{Error: "Database error"}
+			errson, _ := json.Marshal(errdres)
+			w.WriteHeader(500)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(errson)
+			return
+		}
+	} else {
+		chirps, err = apiCfg.dbQueries.AllChirps(r.Context())
+		if err != nil {
+			errdres := errorResponse{Error: "Database error"}
+			errson, _ := json.Marshal(errdres)
+			w.WriteHeader(500)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(errson)
+			return
+		}
+	}
+
+	sortby := r.URL.Query().Get("sort")
+	if sortby == "desc" {
+		sort.Slice(chirps, func(i, j int) bool {
+			return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+		})
 	}
 
 	var res []chirpResponse
